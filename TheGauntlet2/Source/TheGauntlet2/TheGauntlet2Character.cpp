@@ -1,133 +1,228 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "TheGauntlet2Character.h"
+
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
+
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
-#include "TheGauntlet2.h"
+#include "Blueprint/UserWidget.h"
+#include "DrawDebugHelpers.h"
+#include "Engine/EngineTypes.h"
+
+#include "Core/MyGameInstance.h"
+#include "Interaction/Interactable.h"
 
 ATheGauntlet2Character::ATheGauntlet2Character()
 {
-	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
-		
-	// Don't rotate when the controller rotates. Let that just affect the camera.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
-
-	// Configure character movement
 	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0.0f, 500.0f, 0.0f);
+	GetCharacterMovement()->RotationRate = FRotator(0.f, 500.f, 0.f);
 
-	// Note: For faster iteration times these variables, and many more, can be tweaked in the Character Blueprint
-	// instead of recompiling to adjust them
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.35f;
 	GetCharacterMovement()->MaxWalkSpeed = 500.f;
-	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
-	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
-	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
 
-	// Create a camera boom (pulls in towards the player if there is a collision)
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f;
+	CameraBoom->TargetArmLength = 400.f;
 	CameraBoom->bUsePawnControlRotation = true;
 
-	// Create a follow camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	FollowCamera->SetupAttachment(CameraBoom);
 	FollowCamera->bUsePawnControlRotation = false;
+}
 
-	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
-	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
+void ATheGauntlet2Character::BeginPlay()
+{
+	Super::BeginPlay();
+
+	UE_LOG(LogTemp, Warning, TEXT("CHARACTER SPAWNATO"));
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		{
+			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		}
+	}
+
 }
 
 void ATheGauntlet2Character::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
-	// Set up action bindings
-	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
-		
-		// Jumping
+	Super::SetupPlayerInputComponent(PlayerInputComponent);
+
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
+	{
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
-		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ATheGauntlet2Character::Move);
+
+		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATheGauntlet2Character::Look);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ATheGauntlet2Character::Look);
 
-		// Looking
-		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATheGauntlet2Character::Look);
-	}
-	else
-	{
-		UE_LOG(LogTheGauntlet2, Error, TEXT("'%s' Failed to find an Enhanced Input component! This template is built to use the Enhanced Input system. If you intend to use the legacy system, then you will need to update this C++ file."), *GetNameSafe(this));
+		EnhancedInputComponent->BindAction(PauseAction, ETriggerEvent::Started, this, &ATheGauntlet2Character::HandlePause);
+
+		if (InteractAction)
+		{
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ATheGauntlet2Character::DoInteract);
+		}
 	}
 }
 
 void ATheGauntlet2Character::Move(const FInputActionValue& Value)
 {
-	// input is a Vector2D
 	FVector2D MovementVector = Value.Get<FVector2D>();
-
-	// route the input
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
 void ATheGauntlet2Character::Look(const FInputActionValue& Value)
 {
-	// input is a Vector2D
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
-
-	// route the input
 	DoLook(LookAxisVector.X, LookAxisVector.Y);
 }
 
 void ATheGauntlet2Character::DoMove(float Right, float Forward)
 {
-	if (GetController() != nullptr)
+	if (Controller)
 	{
-		// find out which way is forward
-		const FRotator Rotation = GetController()->GetControlRotation();
+		const FRotator Rotation = Controller->GetControlRotation();
 		const FRotator YawRotation(0, Rotation.Yaw, 0);
 
-		// get forward vector
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		const FVector ForwardDir = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+		const FVector RightDir = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
-		// get right vector 
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-		// add movement 
-		AddMovementInput(ForwardDirection, Forward);
-		AddMovementInput(RightDirection, Right);
+		AddMovementInput(ForwardDir, Forward);
+		AddMovementInput(RightDir, Right);
 	}
 }
 
 void ATheGauntlet2Character::DoLook(float Yaw, float Pitch)
 {
-	if (GetController() != nullptr)
-	{
-		// add yaw and pitch input to controller
-		AddControllerYawInput(Yaw);
-		AddControllerPitchInput(Pitch);
-	}
+	AddControllerYawInput(Yaw);
+	AddControllerPitchInput(Pitch);
 }
 
 void ATheGauntlet2Character::DoJumpStart()
 {
-	// signal the character to jump
 	Jump();
 }
 
 void ATheGauntlet2Character::DoJumpEnd()
 {
-	// signal the character to stop jumping
 	StopJumping();
+}
+void ATheGauntlet2Character::HandlePause()
+{
+	if (UMyGameInstance* GI = GetGameInstance<UMyGameInstance>())
+	{
+		APlayerController* PC = Cast<APlayerController>(GetController());
+
+		if (!PC) return;
+
+		if (GI->CurrentState == EGameState::Paused)
+		{
+			GI->SetPaused(false);
+
+			if (PauseMenuInstance)
+			{
+				PauseMenuInstance->RemoveFromParent();
+			}
+
+			FInputModeGameOnly InputMode;
+			PC->SetInputMode(InputMode);
+			PC->bShowMouseCursor = false;
+		}
+		else
+		{
+			GI->SetPaused(true);
+
+			if (PauseMenuClass)
+			{
+				PauseMenuInstance = CreateWidget<UUserWidget>(PC, PauseMenuClass);
+				if (PauseMenuInstance)
+				{
+					PauseMenuInstance->AddToViewport();
+				}
+			}
+
+			FInputModeUIOnly InputMode;
+			if (PauseMenuInstance)
+			{
+				InputMode.SetWidgetToFocus(PauseMenuInstance->TakeWidget());
+			}
+			PC->SetInputMode(InputMode);
+			PC->bShowMouseCursor = true;
+		}
+	}
+}
+
+void ATheGauntlet2Character::DoInteract()
+{
+	if (!GetWorld())
+	{
+		return;
+	}
+
+	const FVector TraceStart = GetActorLocation() + FVector(0.0f, 0.0f, BaseEyeHeight);
+	const FVector TraceEnd = TraceStart + (GetActorForwardVector() * InteractionDistance);
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(PlayerInteractTrace), false, this);
+	FHitResult HitResult;
+	const bool bHit = GetWorld()->SweepSingleByChannel(
+		HitResult,
+		TraceStart,
+		TraceEnd,
+		FQuat::Identity,
+		ECC_Visibility,
+		FCollisionShape::MakeSphere(InteractionTraceRadius),
+		QueryParams
+	);
+
+	if (bShowInteractionDebug)
+	{
+		const FColor TraceColor = InteractionDebugColor.ToFColor(true);
+		const FColor HitColor = InteractionDebugHitColor.ToFColor(true);
+		const FVector DebugEnd = bHit ? HitResult.ImpactPoint : TraceEnd;
+
+		DrawDebugSphere(GetWorld(), TraceStart, InteractionTraceRadius, 16, TraceColor, false, InteractionDebugDuration);
+		DrawDebugLine(GetWorld(), TraceStart, DebugEnd, bHit ? HitColor : TraceColor, false, InteractionDebugDuration, 0, 2.0f);
+		DrawDebugSphere(GetWorld(), DebugEnd, InteractionTraceRadius, 16, bHit ? HitColor : TraceColor, false, InteractionDebugDuration);
+	}
+
+	if (!bHit || !HitResult.GetActor())
+	{
+		return;
+	}
+
+    if (AActor* InteractableActor = HitResult.GetActor();
+        InteractableActor && InteractableActor->GetClass()->ImplementsInterface(UInteractable::StaticClass()))
+    {
+        IInteractable::Execute_Interact(InteractableActor, this);
+    }
+}
+
+void ATheGauntlet2Character::SetHasArtifact(bool bNewHasArtifact)
+{
+	bHasArtifact = bNewHasArtifact;
+}
+
+void ATheGauntlet2Character::SetCarriedArtifact(AActor* NewArtifact)
+{
+	CarriedArtifact = NewArtifact;
+}
+
+USkeletalMeshComponent* ATheGauntlet2Character::GetArtifactAttachMesh() const
+{
+	return GetMesh();
 }
