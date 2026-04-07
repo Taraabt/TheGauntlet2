@@ -36,7 +36,7 @@ protected:
     FVector OpenOffset = FVector(0.0f, 0.0f, 300.0f);
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Door", meta = (ClampMin = "0.0"))
-    float OpenSpeed = 2.0f;
+    float OpenDuration = 2.0f;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Door")
     bool bStartsOpen = false;
@@ -45,4 +45,5 @@ private:
     bool bIsOpen = false;
     FVector ClosedRelativeLocation = FVector::ZeroVector;
     FVector OpenRelativeLocation = FVector::ZeroVector;
+    float CurrentMoveAlpha = 0.0f;
 };

@@ -26,9 +26,6 @@ public:
     UFUNCTION(BlueprintPure, Category = "Projectile")
     bool IsProjectileActive() const { return bIsActive; }
 
-    UFUNCTION(BlueprintPure, Category = "Projectile")
-    FVector GetCurrentVelocity() const;
-
 protected:
     virtual void BeginPlay() override;
 
@@ -50,13 +47,16 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile")
     float MeshScaleMultiplier = 0.2f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile|Debug")
-    bool bDrawDebugPath = true;
-
-    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Projectile|Debug")
-    FColor DebugPathColor = FColor::Red;
-
 private:
+    UFUNCTION()
+    void OnProjectileHit(
+        UPrimitiveComponent* HitComponent,
+        AActor* OtherActor,
+        UPrimitiveComponent* OtherComp,
+        FVector NormalImpulse,
+        const FHitResult& Hit
+    );
+
     UFUNCTION()
     void OnProjectileOverlap(
         UPrimitiveComponent* OverlappedComponent,

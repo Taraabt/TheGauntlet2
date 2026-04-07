@@ -6,12 +6,13 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
+#include "GameFramework/PlayerStart.h"
+#include "Kismet/GameplayStatics.h"
 
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "Blueprint/UserWidget.h"
-#include "DrawDebugHelpers.h"
 #include "Engine/EngineTypes.h"
 
 #include "Core/MyGameInstance.h"
@@ -19,6 +20,8 @@
 
 ATheGauntlet2Character::ATheGauntlet2Character()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -44,8 +47,6 @@ void ATheGauntlet2Character::BeginPlay()
 {
 	Super::BeginPlay();
 
-	UE_LOG(LogTemp, Warning, TEXT("CHARACTER SPAWNATO"));
-
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
@@ -55,6 +56,16 @@ void ATheGauntlet2Character::BeginPlay()
 		}
 	}
 
+}
+
+void ATheGauntlet2Character::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	if (GetActorLocation().Z <= RespawnZThreshold)
+	{
+		RespawnAtPlayerStart();
+	}
 }
 
 void ATheGauntlet2Character::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -174,7 +185,7 @@ void ATheGauntlet2Character::DoInteract()
 		return;
 	}
 
-	const FVector TraceStart = GetActorLocation() + FVector(0.0f, 0.0f, BaseEyeHeight);
+	const FVector TraceStart = GetActorLocation() + FVector(0.0f, 0.0f, InteractionHeightOffset);
 	const FVector TraceEnd = TraceStart + (GetActorForwardVector() * InteractionDistance);
 
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(PlayerInteractTrace), false, this);
@@ -188,17 +199,6 @@ void ATheGauntlet2Character::DoInteract()
 		FCollisionShape::MakeSphere(InteractionTraceRadius),
 		QueryParams
 	);
-
-	if (bShowInteractionDebug)
-	{
-		const FColor TraceColor = InteractionDebugColor.ToFColor(true);
-		const FColor HitColor = InteractionDebugHitColor.ToFColor(true);
-		const FVector DebugEnd = bHit ? HitResult.ImpactPoint : TraceEnd;
-
-		DrawDebugSphere(GetWorld(), TraceStart, InteractionTraceRadius, 16, TraceColor, false, InteractionDebugDuration);
-		DrawDebugLine(GetWorld(), TraceStart, DebugEnd, bHit ? HitColor : TraceColor, false, InteractionDebugDuration, 0, 2.0f);
-		DrawDebugSphere(GetWorld(), DebugEnd, InteractionTraceRadius, 16, bHit ? HitColor : TraceColor, false, InteractionDebugDuration);
-	}
 
 	if (!bHit || !HitResult.GetActor())
 	{
@@ -225,4 +225,27 @@ void ATheGauntlet2Character::SetCarriedArtifact(AActor* NewArtifact)
 USkeletalMeshComponent* ATheGauntlet2Character::GetArtifactAttachMesh() const
 {
 	return GetMesh();
+}
+
+void ATheGauntlet2Character::FellOutOfWorld(const UDamageType& dmgType)
+{
+	RespawnAtPlayerStart();
+}
+
+void ATheGauntlet2Character::RespawnAtPlayerStart()
+{
+	TArray<AActor*> PlayerStarts;
+	UGameplayStatics::GetAllActorsOfClass(this, APlayerStart::StaticClass(), PlayerStarts);
+
+	if (PlayerStarts.Num() > 0)
+	{
+		const FTransform RespawnTransform = PlayerStarts[0]->GetActorTransform();
+		SetActorLocationAndRotation(
+			RespawnTransform.GetLocation(),
+			RespawnTransform.GetRotation()
+		);
+
+		GetCharacterMovement()->StopMovementImmediately();
+		return;
+	}
 }

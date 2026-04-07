@@ -34,7 +34,6 @@ void AOrbitingPlatformSystem::Tick(float DeltaSeconds)
 
     if (bIsActive && OrbitRoot)
     {
-        // Local rotation keeps the orbit aligned with the actor transform placed in the level.
         OrbitRoot->AddLocalRotation(FRotator(0.0f, RotationSpeedDegrees * DeltaSeconds, 0.0f));
     }
 }

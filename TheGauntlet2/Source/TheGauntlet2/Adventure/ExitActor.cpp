@@ -47,7 +47,6 @@ void AExitActor::Interact_Implementation(AActor* Interactor)
     AActor* CarriedArtifact = Character->GetCarriedArtifact();
     if (CarriedArtifact)
     {
-        // Place the artifact on the altar before completing the quest.
         CarriedArtifact->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
         CarriedArtifact->AttachToComponent(
             ArtifactPlacementPoint,

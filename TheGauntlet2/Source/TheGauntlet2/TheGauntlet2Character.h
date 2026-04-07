@@ -52,6 +52,9 @@ public:
 
 	ATheGauntlet2Character();
 
+	virtual void Tick(float DeltaSeconds) override;
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void HandlePause();
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
@@ -78,6 +81,7 @@ protected:
 
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	virtual void BeginPlay() override;
+	virtual void FellOutOfWorld(const class UDamageType& dmgType) override;
 
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
@@ -95,20 +99,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	float InteractionTraceRadius = 30.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction|Debug")
-	bool bShowInteractionDebug = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction|Debug")
-	FLinearColor InteractionDebugColor = FLinearColor::Yellow;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction|Debug")
-	FLinearColor InteractionDebugHitColor = FLinearColor::Green;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction|Debug")
-	float InteractionDebugDuration = 1.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+	float InteractionHeightOffset = 55.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	FName ArtifactSocketName = TEXT("ArtifactSocket");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Respawn")
+	float RespawnZThreshold = -1000.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Interaction")
 	bool bHasArtifact = false;
@@ -132,4 +130,7 @@ public:
 
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+private:
+	void RespawnAtPlayerStart();
 };

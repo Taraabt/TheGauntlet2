@@ -44,13 +44,11 @@ void AArtifactActor::Interact_Implementation(AActor* Interactor)
     USkeletalMeshComponent* AttachMesh = Character->GetArtifactAttachMesh();
     if (!AttachMesh)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Artifact '%s': mesh di attach del character non valida"), *GetName());
         return;
     }
 
     if (!AttachMesh->DoesSocketExist(Character->GetArtifactSocketName()))
     {
-        UE_LOG(LogTemp, Warning, TEXT("Artifact '%s': socket '%s' non trovato sul character"), *GetName(), *Character->GetArtifactSocketName().ToString());
         return;
     }
 
@@ -59,8 +57,6 @@ void AArtifactActor::Interact_Implementation(AActor* Interactor)
     ArtifactMesh->SetSimulatePhysics(false);
     ArtifactMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     SetActorEnableCollision(false);
-
-    // Attach the visible mesh directly to the character socket to avoid root offset issues.
     ArtifactMesh->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
     ArtifactMesh->AttachToComponent(
         AttachMesh,

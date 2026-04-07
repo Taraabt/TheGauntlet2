@@ -16,20 +16,10 @@ void UQuestSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
     if (!GI)
     {
-        UE_LOG(LogTemp, Error, TEXT("GameInstance non valida"));
         return;
     }
 
     QuestDataTable = GI->QuestDataTable;
-
-    if (!QuestDataTable)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("QuestDataTable NON assegnata"));
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("QuestSubsystem inizializzato"));
-    }
 
     if (!GI->DefaultQuestID.IsNone())
     {
@@ -41,21 +31,17 @@ bool UQuestSubsystem::SetActiveQuest(FName QuestID)
 {
     if (QuestID.IsNone())
     {
-        UE_LOG(LogTemp, Warning, TEXT("SetActiveQuest chiamata con QuestID non valido"));
         return false;
     }
 
     const FQuestDetailsRow* QuestRow = GetQuest(QuestID);
     if (!QuestRow)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Impossibile attivare la quest '%s': riga non trovata"), *QuestID.ToString());
         return false;
     }
 
     ActiveQuestID = QuestID;
     OnQuestChanged.Broadcast(ActiveQuestID);
-
-    UE_LOG(LogTemp, Warning, TEXT("Quest attiva impostata: %s"), *ActiveQuestID.ToString());
     return true;
 }
 
@@ -89,20 +75,12 @@ void UQuestSubsystem::CompleteQuest(FName QuestID)
 
     if (!Quest)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Quest NON trovata"));
         return;
     }
-
-    UE_LOG(LogTemp, Warning, TEXT("Quest completata: %s"), *QuestID.ToString());
 
     if (QuestID == ActiveQuestID)
     {
         OnQuestCompleted.Broadcast(QuestID);
-    }
-
-    if (Quest->RewardData.IsNull())
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Quest '%s': RewardData non assegnata"), *QuestID.ToString());
     }
 
     LoadRewardAsync(Quest->RewardData);
@@ -112,7 +90,6 @@ void UQuestSubsystem::LoadRewardAsync(TSoftObjectPtr<UQuestRewardDataAsset> Rewa
 {
     if (RewardData.IsNull())
     {
-        UE_LOG(LogTemp, Warning, TEXT("LoadRewardAsync chiamata con RewardData nulla"));
         return;
     }
 
@@ -126,11 +103,9 @@ void UQuestSubsystem::LoadRewardAsync(TSoftObjectPtr<UQuestRewardDataAsset> Rewa
 
             if (!Data)
             {
-                UE_LOG(LogTemp, Warning, TEXT("RewardData non caricata correttamente"));
                 return;
             }
 
-            UE_LOG(LogTemp, Warning, TEXT("Reward caricata!"));
             PlayRewardEffects(Data);
         }
     );
@@ -162,7 +137,6 @@ void UQuestSubsystem::PlayRewardEffects(UQuestRewardDataAsset* RewardDataAsset)
 
     if (AssetsToLoad.Num() == 0)
     {
-        UE_LOG(LogTemp, Warning, TEXT("La reward non contiene ne' VFX ne' Sound"));
         return;
     }
 
@@ -179,26 +153,16 @@ void UQuestSubsystem::PlayRewardEffects(UQuestRewardDataAsset* RewardDataAsset)
 
             if (UNiagaraSystem* VFX = RewardDataAsset->VictoryVFX.Get())
             {
-                UE_LOG(LogTemp, Warning, TEXT("Spawn del VFX di vittoria"));
                 UNiagaraFunctionLibrary::SpawnSystemAtLocation(
                     CurrentWorld,
                     VFX,
                     RewardDataAsset->RewardEffectLocation
                 );
             }
-            else if (!RewardDataAsset->VictoryVFX.IsNull())
-            {
-                UE_LOG(LogTemp, Warning, TEXT("VictoryVFX assegnato ma non caricato correttamente"));
-            }
 
             if (USoundBase* Sound = RewardDataAsset->VictorySound.Get())
             {
-                UE_LOG(LogTemp, Warning, TEXT("Play del Sound di vittoria"));
                 UGameplayStatics::PlaySound2D(CurrentWorld, Sound);
-            }
-            else if (!RewardDataAsset->VictorySound.IsNull())
-            {
-                UE_LOG(LogTemp, Warning, TEXT("VictorySound assegnato ma non caricato correttamente"));
             }
         }
     );

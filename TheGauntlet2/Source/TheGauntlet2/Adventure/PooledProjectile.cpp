@@ -2,7 +2,6 @@
 
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "DrawDebugHelpers.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "TimerManager.h"
 
@@ -15,8 +14,13 @@ APooledProjectile::APooledProjectile()
     CollisionSphere->SetSphereRadius(16.0f);
     CollisionSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     CollisionSphere->SetCollisionObjectType(ECC_WorldDynamic);
-    CollisionSphere->SetCollisionResponseToAllChannels(ECR_Overlap);
+    CollisionSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
+    CollisionSphere->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+    CollisionSphere->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+    CollisionSphere->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
     CollisionSphere->SetGenerateOverlapEvents(true);
+    CollisionSphere->SetNotifyRigidBodyCollision(true);
+    CollisionSphere->OnComponentHit.AddDynamic(this, &APooledProjectile::OnProjectileHit);
     CollisionSphere->OnComponentBeginOverlap.AddDynamic(this, &APooledProjectile::OnProjectileOverlap);
 
     ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMesh"));
@@ -53,13 +57,6 @@ void APooledProjectile::ActivateProjectile(const FVector& SpawnLocation, const F
 
     SetProjectileActiveState(true);
 
-    if (bDrawDebugPath && GetWorld())
-    {
-        const FVector DebugEnd = SpawnLocation + (Direction.GetSafeNormal() * Speed * 0.25f);
-        DrawDebugLine(GetWorld(), SpawnLocation, DebugEnd, DebugPathColor, false, ProjectileLifetime, 0, 2.0f);
-        DrawDebugSphere(GetWorld(), SpawnLocation, 12.0f, 12, DebugPathColor, false, ProjectileLifetime);
-    }
-
     if (UWorld* World = GetWorld())
     {
         World->GetTimerManager().SetTimer(LifeTimerHandle, this, &APooledProjectile::DeactivateProjectile, ProjectileLifetime, false);
@@ -76,6 +73,24 @@ void APooledProjectile::DeactivateProjectile()
     ProjectileMovement->StopMovementImmediately();
     ProjectileMovement->Deactivate();
     SetProjectileActiveState(false);
+}
+
+void APooledProjectile::OnProjectileHit(
+    UPrimitiveComponent* HitComponent,
+    AActor* OtherActor,
+    UPrimitiveComponent* OtherComp,
+    FVector NormalImpulse,
+    const FHitResult& Hit)
+{
+    if (!bIsActive)
+    {
+        return;
+    }
+
+    if (OtherActor && OtherActor != this && OtherActor != GetOwner())
+    {
+        DeactivateProjectile();
+    }
 }
 
 void APooledProjectile::OnProjectileOverlap(
@@ -110,9 +125,4 @@ void APooledProjectile::SetProjectileActiveState(bool bNewActive)
     CollisionSphere->SetCollisionEnabled(bIsActive ? ECollisionEnabled::QueryOnly : ECollisionEnabled::NoCollision);
     ProjectileMesh->SetHiddenInGame(!bIsActive);
     ProjectileMesh->SetVisibility(bIsActive, true);
-}
-
-FVector APooledProjectile::GetCurrentVelocity() const
-{
-    return ProjectileMovement ? ProjectileMovement->Velocity : FVector::ZeroVector;
 }

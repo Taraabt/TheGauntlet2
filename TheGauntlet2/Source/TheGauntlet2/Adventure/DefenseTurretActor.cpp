@@ -3,7 +3,6 @@
 #include "Adventure/PooledProjectile.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "TimerManager.h"
@@ -44,8 +43,6 @@ void ADefenseTurretActor::DisableTurret(float Duration)
         World->GetTimerManager().ClearTimer(ReactivationTimerHandle);
         World->GetTimerManager().SetTimer(ReactivationTimerHandle, this, &ADefenseTurretActor::EnableTurret, Duration, false);
     }
-
-    DisplayPoolDebug();
 }
 
 void ADefenseTurretActor::EnableTurret()
@@ -53,18 +50,15 @@ void ADefenseTurretActor::EnableTurret()
     bIsDisabled = false;
     ApplyTurretColor(ActiveColor);
     StartFiringLoop();
-    DisplayPoolDebug();
 }
 
 void ADefenseTurretActor::InitializePool()
 {
     if (!ProjectileClass || !GetWorld())
     {
-        UE_LOG(LogTemp, Warning, TEXT("DefenseTurretActor '%s': ProjectileClass non assegnata o World non valida"), *GetName());
         return;
     }
 
-    // The turret creates every projectile once and reuses them during gameplay.
     ProjectilePool.Reserve(PoolSize);
     for (int32 Index = 0; Index < PoolSize; ++Index)
     {
@@ -84,8 +78,6 @@ void ADefenseTurretActor::InitializePool()
             ProjectilePool.Add(Projectile);
         }
     }
-
-    DisplayPoolDebug();
 }
 
 void ADefenseTurretActor::Fire()
@@ -98,8 +90,6 @@ void ADefenseTurretActor::Fire()
     APooledProjectile* Projectile = GetAvailableProjectile();
     if (!Projectile)
     {
-        UE_LOG(LogTemp, Verbose, TEXT("DefenseTurretActor '%s': nessun proiettile disponibile nel pool"), *GetName());
-        DisplayPoolDebug();
         return;
     }
 
@@ -107,18 +97,6 @@ void ADefenseTurretActor::Fire()
     const FVector FireDirection = GetFireDirection(SpawnLocation);
 
     Projectile->ActivateProjectile(SpawnLocation, FireDirection, ProjectileSpeed);
-
-    UE_LOG(
-        LogTemp,
-        Warning,
-        TEXT("Turret '%s' fired projectile '%s' from %s with velocity %s"),
-        *GetName(),
-        *Projectile->GetName(),
-        *SpawnLocation.ToString(),
-        *Projectile->GetCurrentVelocity().ToString()
-    );
-
-    DisplayPoolDebug();
 }
 
 void ADefenseTurretActor::StartFiringLoop()
@@ -143,33 +121,6 @@ APooledProjectile* ADefenseTurretActor::GetAvailableProjectile() const
     }
 
     return nullptr;
-}
-
-int32 ADefenseTurretActor::CountActiveProjectiles() const
-{
-    int32 ActiveProjectiles = 0;
-    for (const APooledProjectile* Projectile : ProjectilePool)
-    {
-        if (Projectile && Projectile->IsProjectileActive())
-        {
-            ++ActiveProjectiles;
-        }
-    }
-
-    return ActiveProjectiles;
-}
-
-void ADefenseTurretActor::DisplayPoolDebug() const
-{
-    if (GEngine)
-    {
-        GEngine->AddOnScreenDebugMessage(
-            reinterpret_cast<uint64>(this),
-            1.0f,
-            FColor::White,
-            FString::Printf(TEXT("Pool Size: %d | Active: %d"), ProjectilePool.Num(), CountActiveProjectiles())
-        );
-    }
 }
 
 void ADefenseTurretActor::ApplyTurretColor(const FLinearColor& NewColor)

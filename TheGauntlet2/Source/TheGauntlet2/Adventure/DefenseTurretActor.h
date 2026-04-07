@@ -74,8 +74,6 @@ private:
     void Fire();
     void StartFiringLoop();
     APooledProjectile* GetAvailableProjectile() const;
-    int32 CountActiveProjectiles() const;
-    void DisplayPoolDebug() const;
     void ApplyTurretColor(const FLinearColor& NewColor);
     FVector GetFireDirection(const FVector& SpawnLocation) const;
 };

@@ -22,6 +22,7 @@ void ASimpleDoorActor::BeginPlay()
     ClosedRelativeLocation = DoorMesh->GetRelativeLocation();
     OpenRelativeLocation = ClosedRelativeLocation + OpenOffset;
     bIsOpen = bStartsOpen;
+    CurrentMoveAlpha = bIsOpen ? 1.0f : 0.0f;
 
     DoorMesh->SetRelativeLocation(bIsOpen ? OpenRelativeLocation : ClosedRelativeLocation);
 }
@@ -30,8 +31,16 @@ void ASimpleDoorActor::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
 
-    const FVector TargetLocation = bIsOpen ? OpenRelativeLocation : ClosedRelativeLocation;
-    const FVector NewLocation = FMath::VInterpTo(DoorMesh->GetRelativeLocation(), TargetLocation, DeltaSeconds, OpenSpeed);
+    if (OpenDuration <= KINDA_SMALL_NUMBER)
+    {
+        DoorMesh->SetRelativeLocation(bIsOpen ? OpenRelativeLocation : ClosedRelativeLocation);
+        CurrentMoveAlpha = bIsOpen ? 1.0f : 0.0f;
+        return;
+    }
+
+    const float AlphaDirection = bIsOpen ? 1.0f : -1.0f;
+    CurrentMoveAlpha = FMath::Clamp(CurrentMoveAlpha + ((DeltaSeconds / OpenDuration) * AlphaDirection), 0.0f, 1.0f);
+    const FVector NewLocation = FMath::Lerp(ClosedRelativeLocation, OpenRelativeLocation, CurrentMoveAlpha);
     DoorMesh->SetRelativeLocation(NewLocation);
 }
 
